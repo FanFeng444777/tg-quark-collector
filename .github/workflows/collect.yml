@@ -1,0 +1,35 @@
+name: collect
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'   # 每 2 小时跑一次
+  workflow_dispatch:          # 允许手动触发
+
+permissions:
+  contents: write              # 允许 push 回仓库
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install
+      - name: collect
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          TG_SESSION: ${{ secrets.TG_SESSION }}
+          TG_CHANNELS: ${{ secrets.TG_CHANNELS }}
+        run: node collect.js
+      - name: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/quark.json
+          git diff --staged --quiet && echo "无更新" && exit 0
+          git commit -m "data: update $(date -u +%FT%TZ) (+$(git diff --staged --numstat | awk '{print $1}') lines)"
+          git push
