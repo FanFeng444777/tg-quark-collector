@@ -64,39 +64,52 @@ const newItems = [];
 for (const ch of channels) {
   try {
     const entity = await client.getEntity(ch);
-    const messages = await client.getMessages(entity, { limit: 2000 });
+    const messages = await client.getMessages(entity, { limit: 100 });
     console.log(`[${ch}] 拉到 ${messages.length} 条消息`);
 
     for (const msg of messages) {
       const text = msg.message || "";
-      if (!text.includes("quark.cn")) continue;
 
+      // 收集这条消息里所有夸克链接：文本里的 + 内联按钮里的
+      const links = [];
       let m;
       QUARK_RE.lastIndex = 0;
       while ((m = QUARK_RE.exec(text)) !== null) {
-        const url = `https://pan.quark.cn/s/${m[1]}`;
-
-        let password = m[2] || "";
-        if (!password) {
-          const pm = text.match(PWD_RE);
-          if (pm) password = pm[1];
+        links.push(`https://pan.quark.cn/s/${m[1]}`);
+      }
+      // 从内联按钮提取（如 seedhub_chat 频道）
+      const buttons = msg.replyMarkup?.rows?.flatMap((r) => r.buttons) || [];
+      for (const btn of buttons) {
+        if (btn.url && btn.url.includes("pan.quark.cn/s/")) {
+          links.push(btn.url.split("?")[0]);
         }
+      }
+      if (links.length === 0) continue;
 
-        // 标题提取：优先取"名称："到"描述/简介/夸克/链接/大小"之间的内容，多行合并，去掉"名称："前缀
-        let titleRaw = "";
-        const nameMatch = text.match(/名称[：:]([\s\S]*?)(?:描述[：:]|简介[：:]|夸克[：:]|链接[：:]|大小[：:]|标签[：:]|$)/);
-        if (nameMatch) {
-          titleRaw = nameMatch[1];
-        } else {
-          titleRaw = text.split("\n")[0].replace(/^名称[：:]/, "");
-        }
+      // 标题提取：优先"名称："格式，否则取第一行（去掉标签行、主演行等）
+      let titleRaw = "";
+      const nameMatch = text.match(/名称[：:]([\s\S]*?)(?:描述[：:]|简介[：:]|夸克[：:]|链接[：:]|大小[：:]|标签[：:]|$)/);
+      if (nameMatch) {
+        titleRaw = nameMatch[1];
+      } else {
+        // 取第一行非标签、非主演的标题
+        titleRaw = text
+          .split("\n")
+          .map((l) => l.trim())
+          .find((l) => l && !l.startsWith("#") && !l.startsWith("主演") && !l.startsWith("导演") && !l.startsWith("豆瓣") && !l.startsWith("影片") && !l.startsWith("简介") && !l.startsWith("描述")) || text.split("\n")[0];
+      }
 
-        const title = titleRaw
-          .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, "")
-          .replace(/\s+/g, " ")
-          .replace(/^[\s\[\]【】()（）#*\-•·|]+/, "")
-          .slice(0, 120)
-          .trim();
+      const title = titleRaw
+        .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, "")
+        .replace(/\s+/g, " ")
+        .replace(/^[\s\[\]【】()（）#*\-•·|]+/, "")
+        .slice(0, 120)
+        .trim();
+
+      for (const url of links) {
+        let password = "";
+        const pm = text.match(PWD_RE);
+        if (pm) password = pm[1];
 
         // 去重：URL 不存在 或 URL 存在但标题变了（如剧集更新），都加入待写入
         const isNew = !existingMap.has(url);
