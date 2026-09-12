@@ -64,7 +64,7 @@ const newItems = [];
 for (const ch of channels) {
   try {
     const entity = await client.getEntity(ch);
-    const messages = await client.getMessages(entity, { limit: 100 });
+    const messages = await client.getMessages(entity, { limit: 5000 });
     console.log(`[${ch}] 拉到 ${messages.length} 条消息`);
 
     for (const msg of messages) {
