@@ -99,6 +99,7 @@ for (const ch of channels) {
           .trim();
 
         // 去重：URL 不存在 或 URL 存在但标题变了（如剧集更新），都加入待写入
+        const isNew = !existingMap.has(url);
         const oldTitle = existingMap.get(url);
         if (oldTitle === title) continue;
         existingMap.set(url, title);
@@ -109,6 +110,7 @@ for (const ch of channels) {
           password,
           source: `tg:${ch.replace(/^https?:\/\/t\.me\//, "")}`,
           created_at: msg.date ? new Date(msg.date * 1000).toISOString() : new Date().toISOString(),
+          _isNew: isNew,
         });
       }
     }
@@ -119,24 +121,46 @@ for (const ch of channels) {
 
 await client.disconnect();
 
-// 批量写入 Supabase
+// 分批写入 Supabase
 if (newItems.length > 0) {
-  console.log(`写入 ${newItems.length} 条新数据到 Supabase...`);
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/items`, {
-    method: "POST",
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates",
-    },
-    body: JSON.stringify(newItems),
-  });
-  if (!res.ok) {
-    console.error("写入失败:", res.status, await res.text());
-    process.exit(1);
+  const toInsert = newItems.filter((i) => i._isNew).map(({ _isNew, ...rest }) => rest);
+  const toUpdate = newItems.filter((i) => !i._isNew).map(({ _isNew, ...rest }) => rest);
+
+  const BATCH = 500;
+  const headers = {
+    apikey: SUPABASE_KEY,
+    Authorization: `Bearer ${SUPABASE_KEY}`,
+    "Content-Type": "application/json",
+  };
+
+  // 新 URL：POST 插入
+  for (let i = 0; i < toInsert.length; i += BATCH) {
+    const batch = toInsert.slice(i, i + BATCH);
+    console.log(`插入 ${batch.length} 条新数据...`);
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/items`, {
+      method: "POST",
+      headers: { ...headers, Prefer: "return=minimal" },
+      body: JSON.stringify(batch),
+    });
+    if (!res.ok) {
+      console.error("插入失败:", res.status, await res.text());
+      process.exit(1);
+    }
   }
-  console.log("写入成功");
+
+  // 已存在 URL：PUT 更新标题（按 url 匹配）
+  for (const item of toUpdate) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/items?url=eq.${encodeURIComponent(item.url)}`, {
+      method: "PATCH",
+      headers: { ...headers, Prefer: "return=minimal" },
+      body: JSON.stringify({ title: item.title, password: item.password }),
+    });
+    if (!res.ok) {
+      console.error("更新失败:", res.status, await res.text());
+    }
+  }
+
+  console.log(`完成：新增 ${toInsert.length}，更新 ${toUpdate.length}`);
 } else {
   console.log("无新数据");
 }
