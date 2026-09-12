@@ -1,0 +1,13 @@
+{
+  "name": "tg-quark-collector",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "login": "node login.js",
+    "collect": "node collect.js"
+  },
+  "dependencies": {
+    "telegram": "^2.26.16"
+  }
+}
