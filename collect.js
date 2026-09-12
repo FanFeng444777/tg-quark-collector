@@ -60,7 +60,7 @@ const client = new TelegramClient(new StringSession(sessionStr), apiId, apiHash,
 await client.connect();
 
 const newItems = [];
-const isFirstRun = true; // 临时调试
+const isFirstRun = true; // 临时拉 5000
 
 for (const ch of channels) {
   try {
@@ -82,14 +82,11 @@ for (const ch of channels) {
       while ((m = QUARK_RE.exec(text)) !== null) {
         links.push(`https://pan.quark.cn/s/${m[1]}`);
       }
-      // 从内联按钮提取（如 seedhub_chat 频道）
-      const buttons = msg.replyMarkup?.rows?.flatMap((r) => r.buttons) || [];
-      if (buttons.length > 0) {
-        console.log("按钮列表:", JSON.stringify(buttons.map(b => ({ text: b.text, url: b.url || null, type: b.className }))));
-      }
-      for (const btn of buttons) {
-        if (btn.url && btn.url.includes("quark")) {
-          const bm = btn.url.match(/pan\.quark\.cn\/s\/([a-zA-Z0-9]+)/);
+      // 从消息文本实体提取超链接（seedhub_chat 的"夸克网盘"是 text link 不是 button）
+      const entities = msg.entities || [];
+      for (const ent of entities) {
+        if (ent.url && ent.url.includes("pan.quark.cn/s/")) {
+          const bm = ent.url.match(/pan\.quark\.cn\/s\/([a-zA-Z0-9]+)/);
           if (bm) links.push(`https://pan.quark.cn/s/${bm[1]}`);
         }
       }
