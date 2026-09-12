@@ -60,11 +60,12 @@ const client = new TelegramClient(new StringSession(sessionStr), apiId, apiHash,
 await client.connect();
 
 const newItems = [];
+const isFirstRun = existingMap.size === 0;
 
 for (const ch of channels) {
   try {
     const entity = await client.getEntity(ch);
-    const fetchLimit = existingMap.size === 0 ? 7000 : 100;
+    const fetchLimit = isFirstRun ? 5000 : 100;
     const messages = await client.getMessages(entity, { limit: fetchLimit });
     console.log(`[${ch}] 拉到 ${messages.length} 条消息`);
 
@@ -84,8 +85,10 @@ for (const ch of channels) {
       // 从内联按钮提取（如 seedhub_chat 频道）
       const buttons = msg.replyMarkup?.rows?.flatMap((r) => r.buttons) || [];
       for (const btn of buttons) {
-        if (btn.url && btn.url.includes("pan.quark.cn/s/")) {
-          links.push(btn.url.split("?")[0]);
+        if (btn.url && btn.url.includes("quark")) {
+          console.log("按钮URL:", btn.text, "→", btn.url);
+          const bm = btn.url.match(/pan\.quark\.cn\/s\/([a-zA-Z0-9]+)/);
+          if (bm) links.push(`https://pan.quark.cn/s/${bm[1]}`);
         }
       }
       if (links.length === 0) continue;
