@@ -1,7 +1,7 @@
 // GitHub Actions 里跑：拉 TG 频道消息，正则提取夸克链接，合并去重后写 data/quark.json
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions/index.js";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 
 const apiId = Number(process.env.TG_API_ID);
 const apiHash = process.env.TG_API_HASH;
@@ -86,6 +86,7 @@ await client.disconnect();
 
 // 按时间倒序写回
 items.sort((a, b) => (a.datetime < b.datetime ? 1 : -1));
+mkdirSync(new URL("./data", import.meta.url), { recursive: true });
 writeFileSync(DATA_FILE, JSON.stringify(items, null, 2));
 
 console.log(`\n入库前: ${before}  入库后: ${items.length}  本次新增: ${items.length - before}`);
