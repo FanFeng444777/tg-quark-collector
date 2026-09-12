@@ -64,12 +64,15 @@ const newItems = [];
 for (const ch of channels) {
   try {
     const entity = await client.getEntity(ch);
-    const fetchLimit = existingMap.size === 0 ? 5000 : 100;
+    const fetchLimit = existingMap.size === 0 ? 7000 : 100;
     const messages = await client.getMessages(entity, { limit: fetchLimit });
     console.log(`[${ch}] 拉到 ${messages.length} 条消息`);
 
     for (const msg of messages) {
       const text = msg.message || "";
+
+      // 过滤广告消息
+      if (/(能量闪租|TRX|USDT|闪兑|VIEW BOT|广告|推广|兼职|刷单|日赚|月入)/i.test(text)) continue;
 
       // 收集这条消息里所有夸克链接：文本里的 + 内联按钮里的
       const links = [];
@@ -102,8 +105,10 @@ for (const ch of channels) {
 
       const title = titleRaw
         .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, "")
+        .replace(/https?:\/\/\S+/g, "")
         .replace(/\s+/g, " ")
-        .replace(/^[\s\[\]【】()（）#*\-•·|]+/, "")
+        .replace(/^[\s\[\]【】()（）#*\-•·|：:]+/, "")
+        .replace(/[：:]\s*$/, "")
         .slice(0, 120)
         .trim();
 
