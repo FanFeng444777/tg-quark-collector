@@ -1,6 +1,18 @@
 # tg-quark-collector
 
-定时从 Telegram 频道拉夸克网盘分享链接，存成 `data/quark.json`。
+定时从 Telegram 频道拉夸克网盘分享链接，直接写入 Supabase PostgreSQL。Flutter App 直连 Supabase REST API 搜索。
+
+## 架构
+
+```
+GitHub Actions（每2小时）
+  → GramJS 拉 TG 频道消息
+  → 提取夸克链接 + 标题
+  → 新 URL 批量 POST 插入 Supabase
+  → 已存在但标题变了 并发 PATCH 更新
+Supabase
+  → Flutter App 直连 REST API 搜索
+```
 
 ## 一次性准备
 
@@ -16,47 +28,87 @@
 
 ```bash
 npm install
-set TG_API_ID=你的api_id
-set TG_API_HASH=你的api_hash
+$env:TG_API_ID="你的api_id"
+$env:TG_API_HASH="你的api_hash"
+$env:SOCKS_PROXY_PORT="7897"   # 你的代理端口
 node login.js
 ```
 
-按提示输入手机号、验证码。成功后会输出一大串 session 字符串，复制下来。
+按提示输入手机号、验证码。成功后输出 session 字符串，复制下来。
 
-### 3. 建 GitHub 仓库，配 Secrets
+### 3. Supabase 建表
 
-把本项目推到 GitHub（**建议公开仓库**，Actions 分钟数无限）。
+在 Supabase SQL Editor 执行：
 
-仓库 **Settings → Secrets and variables → Actions → New repository secret**，加四个：
+```sql
+create table items (
+  id bigint generated always as identity primary key,
+  title text not null,
+  url text not null unique,
+  password text default '',
+  source text default '',
+  created_at timestamptz default now()
+);
+
+-- 模糊搜索索引
+create extension if not exists pg_trgm;
+create index idx_items_title on items using gin (title gin_trgm_ops);
+
+-- 关闭 RLS（Flutter 直连用 anon key）
+alter table items disable row level security;
+```
+
+### 4. GitHub Secrets
+
+仓库 **Settings → Secrets and variables → Actions → New repository secret**，加六个：
 
 | Secret | 值 |
 |---|---|
 | `TG_API_ID` | 第一步的 api_id |
 | `TG_API_HASH` | 第一步的 api_hash |
 | `TG_SESSION` | 第二步输出的 session 字符串 |
-| `TG_CHANNELS` | 逗号分隔的频道名，如 `quark_share,https://t.me/another_channel` |
+| `TG_CHANNELS` | 逗号分隔，如 `mqte5,Quark_Movies` |
+| `SUPABASE_URL` | Supabase 项目 URL |
+| `SUPABASE_SECRET_KEY` | Supabase secret key |
 
-### 4. 跑
+### 5. 跑
 
-Actions 页面手动点一次 `Run workflow`，或等每 2 小时自动跑。
-
-跑完后 `data/quark.json` 里就是全部采集到的链接。
+Actions 页面手动点 `Run workflow`，或等每 2 小时自动跑。
 
 ## 数据格式
 
-```json
-[
-  {
-    "title": "资源标题",
-    "url": "https://pan.quark.cn/s/xxx",
-    "password": "8888",
-    "source": "tg:频道名",
-    "datetime": "2026-09-12T00:00:00.000Z"
-  }
-]
+Supabase 表 `items`：
+
+| 字段 | 说明 |
+|---|---|
+| `id` | 自增主键 |
+| `title` | 资源标题（清洗后） |
+| `url` | 夸克分享链接（unique） |
+| `password` | 提取码（如有） |
+| `source` | 来源频道 |
+| `created_at` | 消息时间 |
+
+## Flutter 搜索 API
+
 ```
+GET {SUPABASE_URL}/rest/v1/items
+  ?title=ilike.*关键词*
+  &select=id,title,url,password,source,created_at
+  &order=created_at.desc
+  &limit=20&offset=0
+Headers:
+  apikey: {publishable_key}
+  Authorization: Bearer {publishable_key}
+  Prefer: count=exact
+```
+
+## 去重逻辑
+
+- 启动时从 Supabase 分页拉取所有 URL → title 映射
+- URL 不存在 → 新增
+- URL 存在但标题变了（如剧集从"1-5集"更新到"1-7集"）→ PATCH 更新标题
+- URL 存在且标题相同 → 跳过
 
 ## 找频道
 
-在 TG 里搜关键词：`夸克网盘`、`夸克分享`、`网盘资源`、`quark`，能找到一堆公开频道。
-挑更新活跃的，把用户名（`@xxx` 或 `https://t.me/xxx`）填进 `TG_CHANNELS`。
+在 TG 里搜关键词：`夸克网盘`、`夸克分享`、`网盘资源`、`quark`，挑更新活跃的频道名填进 `TG_CHANNELS`。
