@@ -148,19 +148,27 @@ if (newItems.length > 0) {
     }
   }
 
-  // 已存在 URL：PUT 更新标题（按 url 匹配）
-  for (const item of toUpdate) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/items?url=eq.${encodeURIComponent(item.url)}`, {
-      method: "PATCH",
-      headers: { ...headers, Prefer: "return=minimal" },
-      body: JSON.stringify({ title: item.title, password: item.password }),
-    });
-    if (!res.ok) {
-      console.error("更新失败:", res.status, await res.text());
-    }
+  // 已存在 URL：批量并发更新标题（每批 20 个）
+  const CONCURRENCY = 20;
+  let updated = 0, failed = 0;
+  for (let i = 0; i < toUpdate.length; i += CONCURRENCY) {
+    const batch = toUpdate.slice(i, i + CONCURRENCY);
+    await Promise.all(batch.map(async (item) => {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/items?url=eq.${encodeURIComponent(item.url)}`, {
+          method: "PATCH",
+          headers: { ...headers, Prefer: "return=minimal" },
+          body: JSON.stringify({ title: item.title, password: item.password }),
+        });
+        if (res.ok) updated++;
+        else { failed++; console.error("更新失败:", res.status); }
+      } catch (e) {
+        failed++;
+      }
+    }));
   }
 
-  console.log(`完成：新增 ${toInsert.length}，更新 ${toUpdate.length}`);
+  console.log(`完成：新增 ${toInsert.length}，更新 ${updated}，失败 ${failed}`);
 } else {
   console.log("无新数据");
 }
