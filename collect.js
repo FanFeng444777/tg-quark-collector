@@ -60,12 +60,12 @@ const client = new TelegramClient(new StringSession(sessionStr), apiId, apiHash,
 await client.connect();
 
 const newItems = [];
-const isFirstRun = true; // 临时拉 5000
+const isFirstRun = existingMap.size === 0;
 
 for (const ch of channels) {
   try {
     const entity = await client.getEntity(ch);
-    const fetchLimit = isFirstRun ? 5000 : 100;
+    const fetchLimit = isFirstRun ? 5000 : 200;
     const messages = await client.getMessages(entity, { limit: fetchLimit });
     console.log(`[${ch}] 拉到 ${messages.length} 条消息`);
 
