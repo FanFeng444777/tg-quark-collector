@@ -27,12 +27,21 @@ const QUARK_RE = /https?:\/\/pan\.quark\.cn\/s\/([a-zA-Z0-9]+)(?:\?pwd=([a-zA-Z0
 const PWD_RE = /(?:提取码|密码|pwd)[：:\s]*([a-zA-Z0-9]{4})/i;
 
 // 从 Supabase 拉已有 URL 做去重
-console.log("拉取已有 URL...");
-const existingRes = await fetch(`${SUPABASE_URL}/rest/v1/items?select=url`, {
-  headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-});
-const existingUrls = new Set((await existingRes.json()).map((r) => r.url));
-console.log(`Supabase 已有 ${existingUrls.size} 条`);
+console.log("拉取已有数据...");
+const existingMap = new Map(); // url -> title
+let offset = 0;
+while (true) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/items?select=url,title&limit=1000&offset=${offset}`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+  );
+  const batch = await res.json();
+  if (!Array.isArray(batch) || batch.length === 0) break;
+  batch.forEach((r) => existingMap.set(r.url, r.title));
+  if (batch.length < 1000) break;
+  offset += 1000;
+}
+console.log(`Supabase 已有 ${existingMap.size} 条`);
 
 const proxyOpts = process.env.SOCKS_PROXY_PORT
   ? {
@@ -66,8 +75,6 @@ for (const ch of channels) {
       QUARK_RE.lastIndex = 0;
       while ((m = QUARK_RE.exec(text)) !== null) {
         const url = `https://pan.quark.cn/s/${m[1]}`;
-        if (existingUrls.has(url)) continue;
-        existingUrls.add(url);
 
         let password = m[2] || "";
         if (!password) {
@@ -90,6 +97,11 @@ for (const ch of channels) {
           .replace(/^[\s\[\]【】()（）#*\-•·|]+/, "")
           .slice(0, 120)
           .trim();
+
+        // 去重：URL 不存在 或 URL 存在但标题变了（如剧集更新），都加入待写入
+        const oldTitle = existingMap.get(url);
+        if (oldTitle === title) continue;
+        existingMap.set(url, title);
 
         newItems.push({
           title: title || "(无标题)",
