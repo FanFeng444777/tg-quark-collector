@@ -40,7 +40,7 @@ for (const ch of channels) {
   try {
     const entity = await client.getEntity(ch);
     // 每次拉最近 200 条，靠 url 去重
-    const messages = await client.getMessages(entity, { limit: 200 });
+    const messages = await client.getMessages(entity, { limit: 4000 });
     console.log(`[${ch}] 拉到 ${messages.length} 条消息`);
 
     for (const msg of messages) {
