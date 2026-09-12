@@ -60,7 +60,7 @@ const client = new TelegramClient(new StringSession(sessionStr), apiId, apiHash,
 await client.connect();
 
 const newItems = [];
-const isFirstRun = existingMap.size === 0;
+const isFirstRun = true; // 临时调试
 
 for (const ch of channels) {
   try {
