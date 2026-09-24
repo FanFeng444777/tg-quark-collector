@@ -2,7 +2,3 @@ name = "quark-search"
 main = "src/index.ts"
 compatibility_date = "2026-09-01"
 
-[vars]
-SUPABASE_URL = ""
-SUPABASE_SERVICE_KEY = ""
-
