@@ -5,7 +5,7 @@ export default {
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET,OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Headers": "Content-Type,X-Api-Key",
     }
 
     if (request.method === "OPTIONS") {
@@ -13,6 +13,11 @@ export default {
     }
 
     try {
+      const apiKey = request.headers.get("X-Api-Key")
+      if (!apiKey || apiKey !== env.API_KEY) {
+        return Response.json({code:403, msg:"无权限"}, {status:403, headers:corsHeaders})
+      }
+
       const url = new URL(request.url)
       const q = url.searchParams.get("q")
       if (!q) {
@@ -38,5 +43,6 @@ export default {
 interface Env {
   SUPABASE_URL: string
   SUPABASE_SERVICE_KEY: string
+  API_KEY: string
 }
 
