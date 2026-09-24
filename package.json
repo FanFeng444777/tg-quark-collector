@@ -1,13 +1,8 @@
 {
-  "name": "tg-quark-collector",
+  "name": "tg-quark-search-api",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
-  "scripts": {
-    "login": "node login.js",
-    "collect": "node collect.js"
-  },
   "dependencies": {
-    "telegram": "^2.26.16"
+    "@supabase/supabase-js": "^2.45.0"
   }
 }
