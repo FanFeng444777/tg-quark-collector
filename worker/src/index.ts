@@ -45,4 +45,3 @@ interface Env {
   SUPABASE_SERVICE_KEY: string
   API_KEY: string
 }
-
