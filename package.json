@@ -2,7 +2,9 @@
   "name": "tg-quark-search-api",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0"
+    "@supabase/supabase-js": "^2.45.0",
+    "telegram": "^2.26.16"
   }
 }
