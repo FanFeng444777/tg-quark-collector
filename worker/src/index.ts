@@ -36,6 +36,7 @@ export default {
 
       return Response.json({code:0, data}, {headers:corsHeaders})
     } catch(e:any) {
+      console.error('Worker error:', e.message, env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY ? 'key exists' : 'key missing')
       return Response.json({code:500, msg:e.message}, {status:500, headers:corsHeaders})
     }
   }
