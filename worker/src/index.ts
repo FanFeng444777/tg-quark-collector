@@ -28,7 +28,8 @@ export default {
       const {data, error} = await supabase
         .from('items')
         .select('id,title,url')
-        .textSearch('title', q, {type:'plain'})
+        .ilike('title', '%' + q + '%')
+        .order('created_at', {ascending: false})
         .limit(30)
 
       if(error) throw error
